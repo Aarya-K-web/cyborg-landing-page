@@ -1,0 +1,1035 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NEXUS // Human+Machine Interface</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&family=Rajdhani:wght@300;400;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --cyan: #00f5ff;
+    --electric: #0ff;
+    --red: #ff003c;
+    --orange: #ff6b00;
+    --dark: #020810;
+    --darker: #010508;
+    --panel: rgba(0,245,255,0.04);
+    --border: rgba(0,245,255,0.2);
+    --glow: 0 0 20px rgba(0,245,255,0.4);
+    --glow-strong: 0 0 40px rgba(0,245,255,0.7), 0 0 80px rgba(0,245,255,0.3);
+    --text: #c8e8f0;
+  }
+
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--dark);
+    color: var(--text);
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 16px;
+    overflow-x: hidden;
+    cursor: none;
+  }
+
+  /* ── CUSTOM CURSOR ── */
+  #cursor {
+    position: fixed; top: 0; left: 0;
+    width: 12px; height: 12px;
+    background: var(--cyan);
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 9999;
+    transform: translate(-50%,-50%);
+    transition: transform 0.1s, width 0.2s, height 0.2s;
+    box-shadow: var(--glow);
+  }
+  #cursor-ring {
+    position: fixed; top: 0; left: 0;
+    width: 36px; height: 36px;
+    border: 1px solid var(--cyan);
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 9998;
+    transform: translate(-50%,-50%);
+    transition: transform 0.15s, width 0.2s, height 0.2s, opacity 0.2s;
+    opacity: 0.5;
+  }
+
+  /* ── SCANLINE OVERLAY ── */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0,0,0,0.08) 2px,
+      rgba(0,0,0,0.08) 4px
+    );
+    pointer-events: none;
+    z-index: 1000;
+  }
+
+  /* ── BACKGROUND GRID ── */
+  .bg-grid {
+    position: fixed; inset: 0;
+    background-image:
+      linear-gradient(rgba(0,245,255,0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,245,255,0.04) 1px, transparent 1px);
+    background-size: 60px 60px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* ── NAV ── */
+  nav {
+    position: fixed; top: 0; left: 0; right: 0;
+    z-index: 100;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 20px 6%;
+    background: linear-gradient(to bottom, rgba(2,8,16,0.95), transparent);
+    backdrop-filter: blur(4px);
+  }
+  .nav-logo {
+    font-family: 'Orbitron', monospace;
+    font-size: 1.4rem; font-weight: 900;
+    color: var(--cyan);
+    text-shadow: var(--glow);
+    letter-spacing: 4px;
+  }
+  .nav-logo span { color: var(--red); }
+  .nav-links { display: flex; gap: 40px; list-style: none; }
+  .nav-links a {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.8rem; letter-spacing: 2px;
+    color: var(--text); text-decoration: none;
+    text-transform: uppercase;
+    position: relative; padding-bottom: 4px;
+    transition: color 0.3s;
+  }
+  .nav-links a::after {
+    content: ''; position: absolute; bottom: 0; left: 0;
+    width: 0; height: 1px;
+    background: var(--cyan);
+    transition: width 0.3s;
+  }
+  .nav-links a:hover { color: var(--cyan); }
+  .nav-links a:hover::after { width: 100%; }
+  .nav-cta {
+    font-family: 'Orbitron', monospace;
+    font-size: 0.75rem; letter-spacing: 2px;
+    color: var(--cyan); text-decoration: none;
+    border: 1px solid var(--cyan);
+    padding: 8px 20px;
+    transition: all 0.3s;
+    position: relative; overflow: hidden;
+  }
+  .nav-cta::before {
+    content: ''; position: absolute; inset: 0;
+    background: var(--cyan); transform: scaleX(0);
+    transform-origin: left; transition: transform 0.3s;
+    z-index: -1;
+  }
+  .nav-cta:hover { color: var(--dark); box-shadow: var(--glow); }
+  .nav-cta:hover::before { transform: scaleX(1); }
+
+  /* ── HERO ── */
+  .hero {
+    min-height: 100vh;
+    display: grid; place-items: center;
+    position: relative; overflow: hidden;
+    padding: 0 6%;
+  }
+  .hero-bg {
+    position: absolute; inset: 0;
+    background:
+      radial-gradient(ellipse 80% 60% at 60% 50%, rgba(0,245,255,0.06) 0%, transparent 70%),
+      radial-gradient(ellipse 40% 40% at 80% 20%, rgba(255,0,60,0.05) 0%, transparent 60%),
+      var(--dark);
+  }
+  .hero-content {
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 60px; align-items: center;
+    max-width: 1200px; width: 100%;
+    position: relative; z-index: 1;
+    padding-top: 80px;
+  }
+  .hero-badge {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.75rem; letter-spacing: 3px;
+    color: var(--cyan); text-transform: uppercase;
+    display: flex; align-items: center; gap: 10px;
+    margin-bottom: 24px;
+    animation: fadeSlideIn 0.8s ease both;
+  }
+  .hero-badge::before {
+    content: ''; width: 40px; height: 1px;
+    background: var(--cyan);
+  }
+  .hero-badge .blink { animation: blink 1s infinite; }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+
+  h1 {
+    font-family: 'Orbitron', monospace;
+    font-weight: 900;
+    line-height: 1.05;
+    margin-bottom: 24px;
+    animation: fadeSlideIn 0.8s 0.1s ease both;
+  }
+  h1 .line1 { font-size: clamp(2.4rem, 5vw, 4.2rem); display: block; color: #fff; }
+  h1 .line2 { font-size: clamp(2.4rem, 5vw, 4.2rem); display: block; color: var(--cyan); text-shadow: var(--glow-strong); }
+  h1 .line3 { font-size: clamp(1.2rem, 2.5vw, 1.8rem); display: block; color: var(--red); letter-spacing: 8px; margin-top: 8px; }
+
+  .hero-desc {
+    font-size: 1.05rem; font-weight: 300; line-height: 1.8;
+    color: rgba(200,232,240,0.7);
+    margin-bottom: 40px;
+    animation: fadeSlideIn 0.8s 0.2s ease both;
+    max-width: 480px;
+  }
+  .hero-actions {
+    display: flex; gap: 16px; flex-wrap: wrap;
+    animation: fadeSlideIn 0.8s 0.3s ease both;
+  }
+  .btn-primary {
+    font-family: 'Orbitron', monospace;
+    font-size: 0.8rem; letter-spacing: 2px;
+    padding: 14px 32px;
+    background: var(--cyan); color: var(--dark);
+    text-decoration: none; font-weight: 700;
+    clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px));
+    transition: all 0.3s;
+    display: inline-block;
+  }
+  .btn-primary:hover {
+    background: #fff;
+    box-shadow: 0 0 30px rgba(0,245,255,0.8);
+  }
+  .btn-secondary {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.8rem; letter-spacing: 2px;
+    padding: 14px 32px;
+    border: 1px solid rgba(0,245,255,0.4);
+    color: var(--cyan); text-decoration: none;
+    clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px));
+    transition: all 0.3s;
+    display: inline-block;
+  }
+  .btn-secondary:hover {
+    border-color: var(--cyan);
+    box-shadow: var(--glow);
+    background: rgba(0,245,255,0.05);
+  }
+
+  @keyframes fadeSlideIn {
+    from { opacity:0; transform: translateY(20px); }
+    to { opacity:1; transform: translateY(0); }
+  }
+
+  /* ── HERO VISUAL ── */
+  .hero-visual {
+    position: relative; display: flex;
+    justify-content: center; align-items: center;
+    animation: fadeSlideIn 0.8s 0.4s ease both;
+  }
+  .cyborg-frame {
+    width: 380px; height: 480px;
+    position: relative;
+  }
+  .cyborg-svg { width: 100%; height: 100%; }
+  .scan-line {
+    position: absolute; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--cyan), transparent);
+    animation: scanAnim 3s linear infinite;
+    opacity: 0.6;
+  }
+  @keyframes scanAnim {
+    from { top: 0; opacity: 0.8; }
+    to { top: 100%; opacity: 0.2; }
+  }
+  .hex-ring {
+    position: absolute; inset: -30px;
+    border: 1px solid rgba(0,245,255,0.12);
+    border-radius: 50%;
+    animation: spinSlow 20s linear infinite;
+  }
+  .hex-ring::before {
+    content: ''; position: absolute;
+    top: 10px; left: 10px; right: 10px; bottom: 10px;
+    border: 1px solid rgba(0,245,255,0.06);
+    border-radius: 50%;
+  }
+  @keyframes spinSlow { from{transform:rotate(0)} to{transform:rotate(360deg)} }
+
+  /* ── STATS BAR ── */
+  .stats-bar {
+    background: rgba(0,245,255,0.03);
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    padding: 30px 6%;
+    position: relative; z-index: 1;
+  }
+  .stats-inner {
+    max-width: 1200px; margin: 0 auto;
+    display: grid; grid-template-columns: repeat(4,1fr);
+    gap: 0;
+  }
+  .stat-item {
+    text-align: center; padding: 0 20px;
+    border-right: 1px solid var(--border);
+  }
+  .stat-item:last-child { border-right: none; }
+  .stat-num {
+    font-family: 'Orbitron', monospace;
+    font-size: 2.2rem; font-weight: 900;
+    color: var(--cyan); text-shadow: var(--glow);
+    display: block;
+  }
+  .stat-label {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.7rem; letter-spacing: 3px;
+    color: rgba(200,232,240,0.5); text-transform: uppercase;
+    margin-top: 4px; display: block;
+  }
+
+  /* ── ABOUT / IDENTITY SECTION ── */
+  .section {
+    padding: 100px 6%;
+    position: relative; z-index: 1;
+  }
+  .section-tag {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.7rem; letter-spacing: 4px;
+    color: var(--cyan); text-transform: uppercase;
+    margin-bottom: 16px; display: flex;
+    align-items: center; gap: 12px;
+  }
+  .section-tag::after { content:''; flex:1; max-width:60px; height:1px; background:var(--cyan); }
+  h2 {
+    font-family: 'Orbitron', monospace;
+    font-size: clamp(1.8rem, 3.5vw, 2.8rem);
+    font-weight: 700; line-height: 1.2;
+    margin-bottom: 20px; color: #fff;
+  }
+  h2 em { color: var(--cyan); font-style: normal; }
+
+  /* ── FEATURES ── */
+  .features { background: rgba(0,245,255,0.015); }
+  .features-grid {
+    max-width: 1200px; margin: 60px auto 0;
+    display: grid; grid-template-columns: repeat(3,1fr); gap: 1px;
+    border: 1px solid var(--border);
+    background: var(--border);
+  }
+  .feature-card {
+    background: var(--dark);
+    padding: 40px 32px;
+    transition: background 0.3s;
+    position: relative; overflow: hidden;
+  }
+  .feature-card::before {
+    content: ''; position: absolute;
+    top: 0; left: 0; right: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, var(--cyan), transparent);
+    transform: scaleX(0); transition: transform 0.4s;
+  }
+  .feature-card:hover::before { transform: scaleX(1); }
+  .feature-card:hover { background: rgba(0,245,255,0.03); }
+  .feature-icon {
+    width: 48px; height: 48px;
+    border: 1px solid rgba(0,245,255,0.3);
+    display: grid; place-items: center;
+    margin-bottom: 24px;
+    position: relative;
+    clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px));
+  }
+  .feature-icon svg { width: 24px; height: 24px; stroke: var(--cyan); fill: none; stroke-width: 1.5; }
+  .feature-num {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.65rem; color: rgba(0,245,255,0.4);
+    letter-spacing: 2px; margin-bottom: 12px;
+  }
+  .feature-card h3 {
+    font-family: 'Orbitron', monospace;
+    font-size: 1rem; font-weight: 700;
+    color: #fff; margin-bottom: 12px; letter-spacing: 1px;
+  }
+  .feature-card p {
+    font-size: 0.95rem; line-height: 1.7;
+    color: rgba(200,232,240,0.6); font-weight: 300;
+  }
+
+  /* ── AUGMENTATION SPECS ── */
+  .specs-wrapper {
+    max-width: 1200px; margin: 0 auto;
+    display: grid; grid-template-columns: 1fr 1fr; gap: 80px; align-items: center;
+  }
+  .spec-list { margin-top: 40px; }
+  .spec-item {
+    margin-bottom: 28px;
+    position: relative;
+  }
+  .spec-head {
+    display: flex; justify-content: space-between;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.8rem; letter-spacing: 2px;
+    color: var(--text); text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+  .spec-head span { color: var(--cyan); }
+  .spec-bar {
+    height: 3px; background: rgba(0,245,255,0.1);
+    position: relative; overflow: hidden;
+  }
+  .spec-fill {
+    height: 100%; background: linear-gradient(90deg, var(--cyan), rgba(0,245,255,0.4));
+    position: relative;
+    animation: fillAnim 1.5s ease both;
+    box-shadow: 0 0 8px var(--cyan);
+  }
+  @keyframes fillAnim { from{width:0} }
+
+  .spec-visual {
+    position: relative;
+    display: flex; justify-content: center;
+  }
+  .circuit-box {
+    width: 300px; height: 360px;
+    border: 1px solid var(--border);
+    position: relative;
+    clip-path: polygon(0 0, calc(100% - 20px) 0, 100% 20px, 100% 100%, 20px 100%, 0 calc(100% - 20px));
+  }
+  .circuit-inner {
+    position: absolute; inset: 16px;
+    border: 1px solid rgba(0,245,255,0.08);
+    clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 10px 100%, 0 calc(100% - 10px));
+    display: grid; place-items: center;
+  }
+  .circuit-label {
+    font-family: 'Orbitron', monospace;
+    font-size: 0.9rem; font-weight: 700;
+    color: var(--cyan); text-shadow: var(--glow);
+    letter-spacing: 3px; text-align: center;
+  }
+
+  /* ── TIMELINE ── */
+  .timeline { max-width: 800px; margin: 60px auto 0; }
+  .tl-item {
+    display: grid; grid-template-columns: 80px 1fr;
+    gap: 32px; margin-bottom: 40px; position: relative;
+  }
+  .tl-item::after {
+    content:''; position:absolute;
+    left:80px; top:14px; bottom:-40px;
+    width:1px; background:linear-gradient(to bottom, var(--border), transparent);
+  }
+  .tl-item:last-child::after { display:none; }
+  .tl-year {
+    font-family: 'Orbitron', monospace;
+    font-size: 0.75rem; font-weight: 700;
+    color: var(--cyan); text-shadow: var(--glow);
+    padding-top: 2px; letter-spacing: 1px;
+  }
+  .tl-dot {
+    position: absolute; left: 72px; top: 6px;
+    width: 10px; height: 10px;
+    background: var(--cyan); border-radius: 50%;
+    box-shadow: var(--glow);
+  }
+  .tl-content h4 {
+    font-family: 'Orbitron', monospace;
+    font-size: 0.9rem; color: #fff; margin-bottom: 6px;
+  }
+  .tl-content p { font-size: 0.95rem; color: rgba(200,232,240,0.6); line-height: 1.6; }
+
+  /* ── CTA ── */
+  .cta-section {
+    padding: 120px 6%;
+    text-align: center; position: relative; overflow: hidden;
+    background: linear-gradient(to bottom, transparent, rgba(0,245,255,0.03), transparent);
+  }
+  .cta-section::before {
+    content:''; position:absolute; inset:0;
+    background: radial-gradient(ellipse 60% 60% at 50% 50%, rgba(0,245,255,0.05), transparent);
+    pointer-events:none;
+  }
+  .cta-section h2 {
+    max-width: 700px; margin: 0 auto 20px;
+    font-size: clamp(2rem, 4vw, 3.2rem);
+  }
+  .cta-section p {
+    max-width: 500px; margin: 0 auto 48px;
+    color: rgba(200,232,240,0.6); font-size: 1.05rem; line-height:1.8;
+  }
+  .cta-input-row {
+    display: flex; gap: 0; max-width: 460px; margin: 0 auto;
+    border: 1px solid var(--border);
+    clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 14px, 100% 100%, 14px 100%, 0 calc(100% - 14px));
+  }
+  .cta-input-row input {
+    flex:1; background:transparent; border:none; outline:none;
+    padding: 14px 20px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.85rem; color: var(--text);
+    letter-spacing: 1px;
+  }
+  .cta-input-row input::placeholder { color: rgba(200,232,240,0.3); }
+  .cta-input-row button {
+    background: var(--cyan); border: none; cursor: pointer;
+    font-family: 'Orbitron', monospace;
+    font-size: 0.75rem; letter-spacing: 2px;
+    font-weight: 700; color: var(--dark);
+    padding: 14px 24px;
+    transition: background 0.3s;
+  }
+  .cta-input-row button:hover { background: #fff; }
+
+  /* ── FOOTER ── */
+  footer {
+    border-top: 1px solid var(--border);
+    padding: 40px 6%;
+    display: flex; justify-content: space-between; align-items: center;
+    position: relative; z-index: 1;
+  }
+  .footer-logo {
+    font-family: 'Orbitron', monospace;
+    font-size: 1rem; font-weight: 900;
+    color: var(--cyan); letter-spacing: 4px;
+    text-shadow: var(--glow);
+  }
+  .footer-logo span { color: var(--red); }
+  .footer-copy {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.7rem; letter-spacing: 2px;
+    color: rgba(200,232,240,0.3);
+  }
+  .footer-links { display:flex; gap:24px; }
+  .footer-links a {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.7rem; color: rgba(200,232,240,0.5);
+    text-decoration: none; letter-spacing: 1px;
+    transition: color 0.3s;
+  }
+  .footer-links a:hover { color: var(--cyan); }
+
+  /* ── HAMBURGER (mobile) ── */
+  .hamburger { display:none; flex-direction:column; gap:5px; cursor:pointer; padding:4px; }
+  .hamburger span { display:block; width:24px; height:2px; background:var(--cyan); transition:all 0.3s; }
+  .mobile-menu {
+    display:none; position:fixed; inset:0; background:rgba(2,8,16,0.97);
+    z-index:99; flex-direction:column; justify-content:center; align-items:center; gap:32px;
+  }
+  .mobile-menu.open { display:flex; }
+  .mobile-menu a {
+    font-family:'Orbitron',monospace; font-size:1.1rem; letter-spacing:4px;
+    color:var(--text); text-decoration:none; text-transform:uppercase;
+    transition:color 0.3s;
+  }
+  .mobile-menu a:hover { color:var(--cyan); }
+  .mobile-close {
+    position:absolute; top:24px; right:24px;
+    font-family:'Share Tech Mono',monospace; font-size:0.8rem;
+    color:var(--cyan); cursor:pointer; letter-spacing:2px;
+  }
+
+  /* ── GLITCH EFFECT ── */
+  .glitch {
+    position: relative;
+  }
+  .glitch::before, .glitch::after {
+    content: attr(data-text);
+    position: absolute; top:0; left:0;
+    width:100%;
+  }
+  .glitch::before {
+    color: var(--red);
+    clip-path: polygon(0 0, 100% 0, 100% 45%, 0 45%);
+    animation: glitch1 4s infinite;
+  }
+  .glitch::after {
+    color: var(--cyan);
+    clip-path: polygon(0 55%, 100% 55%, 100% 100%, 0 100%);
+    animation: glitch2 4s infinite;
+  }
+  @keyframes glitch1 {
+    0%,90%,100% { transform:translateX(0); }
+    92% { transform:translateX(-4px); }
+    94% { transform:translateX(4px); }
+    96% { transform:translateX(-2px); }
+  }
+  @keyframes glitch2 {
+    0%,88%,100% { transform:translateX(0); }
+    90% { transform:translateX(3px); }
+    92% { transform:translateX(-3px); }
+    95% { transform:translateX(2px); }
+  }
+
+  /* ── RESPONSIVE ── */
+  @media (max-width: 900px) {
+    .hero-content { grid-template-columns: 1fr; text-align:center; padding-top:100px; }
+    .hero-badge { justify-content:center; }
+    .hero-desc { margin:0 auto 40px; }
+    .hero-actions { justify-content:center; }
+    .hero-visual { display:none; }
+    .stats-inner { grid-template-columns: repeat(2,1fr); }
+    .stat-item:nth-child(2) { border-right:none; }
+    .stat-item { border-bottom:1px solid var(--border); padding:20px; }
+    .stat-item:nth-child(3),
+    .stat-item:nth-child(4) { border-bottom:none; }
+    .features-grid { grid-template-columns: 1fr; }
+    .specs-wrapper { grid-template-columns: 1fr; gap:40px; }
+    .spec-visual { display:none; }
+    .nav-links, .nav-cta { display:none; }
+    .hamburger { display:flex; }
+    footer { flex-direction:column; gap:16px; text-align:center; }
+    .footer-links { flex-wrap:wrap; justify-content:center; }
+    .section-tag::after { display:none; }
+  }
+  @media (max-width: 500px) {
+    .stats-inner { grid-template-columns: 1fr 1fr; }
+    .cta-input-row { flex-direction:column; clip-path:none; border:none; gap:12px; }
+    .cta-input-row input { border:1px solid var(--border); clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 10px 100%, 0 calc(100% - 10px)); }
+    .cta-input-row button { clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 10px 100%, 0 calc(100% - 10px)); }
+  }
+</style>
+</head>
+<body>
+<div class="bg-grid"></div>
+<div id="cursor"></div>
+<div id="cursor-ring"></div>
+
+<!-- Mobile Menu -->
+<div class="mobile-menu" id="mobileMenu">
+  <div class="mobile-close" onclick="closeMobileMenu()">[ CLOSE ]</div>
+  <a href="#about">Protocol</a>
+  <a href="#features">Systems</a>
+  <a href="#specs">Augments</a>
+  <a href="#evolution">Evolution</a>
+  <a href="#">Initialize</a>
+</div>
+
+<!-- NAV -->
+<nav>
+  <div class="nav-logo">NEX<span>U</span>S</div>
+  <ul class="nav-links">
+    <li><a href="#about">Protocol</a></li>
+    <li><a href="#features">Systems</a></li>
+    <li><a href="#specs">Augments</a></li>
+    <li><a href="#evolution">Evolution</a></li>
+  </ul>
+  <a href="#cta" class="nav-cta">Initialize</a>
+  <div class="hamburger" onclick="openMobileMenu()">
+    <span></span><span></span><span></span>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-bg"></div>
+  <div class="hero-content">
+    <div class="hero-text">
+      <div class="hero-badge">
+        <span class="blink">◆</span>
+        NEXUS INTERFACE v3.7.1 — ONLINE
+      </div>
+      <h1>
+        <span class="line1">THE NEXT</span>
+        <span class="line2 glitch" data-text="EVOLUTION">EVOLUTION</span>
+        <span class="line3">HUMAN // MACHINE</span>
+      </h1>
+      <p class="hero-desc">
+        Where flesh meets silicon. Neural augmentation redefined for the age of synthetic consciousness. Merge. Adapt. Transcend.
+      </p>
+      <div class="hero-actions">
+        <a href="#features" class="btn-primary">ENTER THE NEXUS</a>
+        <a href="#specs" class="btn-secondary">VIEW AUGMENTS</a>
+      </div>
+    </div>
+    <div class="hero-visual">
+      <div class="cyborg-frame">
+        <div class="hex-ring"></div>
+        <div class="scan-line"></div>
+        <!-- SVG Cyborg Portrait -->
+        <svg class="cyborg-svg" viewBox="0 0 380 480" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <filter id="glow"><feGaussianBlur stdDeviation="3" result="coloredBlur"/><feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+            <radialGradient id="faceGrad" cx="50%" cy="40%"><stop offset="0%" stop-color="#1a4060"/><stop offset="100%" stop-color="#0a1a28"/></radialGradient>
+            <linearGradient id="cyanGrad" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#00f5ff"/><stop offset="100%" stop-color="#0066ff"/></linearGradient>
+          </defs>
+
+          <!-- Body/Shoulders -->
+          <path d="M60 340 Q60 440 80 470 L300 470 Q320 440 320 340 L300 290 Q250 260 190 260 Q130 260 80 290 Z" fill="#0d1f2d" stroke="rgba(0,245,255,0.2)" stroke-width="1"/>
+          <!-- Chest plates -->
+          <path d="M120 300 L190 280 L260 300 L260 400 L190 420 L120 400 Z" fill="#0a1824" stroke="rgba(0,245,255,0.3)" stroke-width="1"/>
+          <line x1="190" y1="280" x2="190" y2="420" stroke="rgba(0,245,255,0.2)" stroke-width="1"/>
+          <path d="M155 320 L190 310 L225 320 L225 370 L190 380 L155 370 Z" fill="rgba(0,245,255,0.05)" stroke="rgba(0,245,255,0.4)" stroke-width="1"/>
+          <!-- Core reactor -->
+          <circle cx="190" cy="345" r="22" fill="rgba(0,245,255,0.1)" stroke="rgba(0,245,255,0.6)" stroke-width="1.5" filter="url(#glow)"/>
+          <circle cx="190" cy="345" r="12" fill="rgba(0,245,255,0.2)" stroke="rgba(0,245,255,0.8)" stroke-width="1"/>
+          <circle cx="190" cy="345" r="5" fill="#00f5ff" filter="url(#glow)"/>
+
+          <!-- Circuit lines on chest -->
+          <path d="M168 345 L150 345 L140 355 L120 355" stroke="rgba(0,245,255,0.3)" stroke-width="1" fill="none"/>
+          <path d="M212 345 L230 345 L240 355 L260 355" stroke="rgba(0,245,255,0.3)" stroke-width="1" fill="none"/>
+          <circle cx="120" cy="355" r="3" fill="rgba(0,245,255,0.5)"/>
+          <circle cx="260" cy="355" r="3" fill="rgba(0,245,255,0.5)"/>
+
+          <!-- Neck -->
+          <rect x="168" y="240" width="44" height="40" rx="4" fill="#0d1f2d" stroke="rgba(0,245,255,0.2)" stroke-width="1"/>
+          <line x1="180" y1="240" x2="180" y2="280" stroke="rgba(0,245,255,0.15)" stroke-width="1"/>
+          <line x1="200" y1="240" x2="200" y2="280" stroke="rgba(0,245,255,0.15)" stroke-width="1"/>
+
+          <!-- Head -->
+          <path d="M130 160 Q130 80 190 70 Q250 80 250 160 L255 240 Q220 255 190 255 Q160 255 125 240 Z" fill="url(#faceGrad)" stroke="rgba(0,245,255,0.3)" stroke-width="1.5"/>
+
+          <!-- Skull plates -->
+          <path d="M140 90 Q190 75 240 90 L245 130 Q190 120 135 130 Z" fill="#0a1824" stroke="rgba(0,245,255,0.2)" stroke-width="1"/>
+          <line x1="190" y1="75" x2="190" y2="130" stroke="rgba(0,245,255,0.15)" stroke-width="1"/>
+
+          <!-- Left eye (human) -->
+          <ellipse cx="163" cy="168" rx="20" ry="14" fill="#081520" stroke="rgba(0,245,255,0.3)" stroke-width="1"/>
+          <ellipse cx="163" cy="168" rx="11" ry="11" fill="#0d2535"/>
+          <ellipse cx="163" cy="168" rx="7" ry="7" fill="#1a4060"/>
+          <ellipse cx="163" cy="168" rx="4" ry="4" fill="#0a0f14"/>
+          <circle cx="166" cy="165" r="2" fill="rgba(255,255,255,0.6)"/>
+
+          <!-- Right eye (cybernetic) -->
+          <ellipse cx="217" cy="168" rx="22" ry="15" fill="#020810" stroke="#00f5ff" stroke-width="1.5" filter="url(#glow)"/>
+          <!-- Targeting reticle -->
+          <circle cx="217" cy="168" r="10" fill="none" stroke="rgba(0,245,255,0.6)" stroke-width="1"/>
+          <circle cx="217" cy="168" r="5" fill="rgba(0,245,255,0.1)" stroke="rgba(0,245,255,0.8)" stroke-width="1"/>
+          <circle cx="217" cy="168" r="2" fill="#00f5ff" filter="url(#glow)"/>
+          <line x1="205" y1="168" x2="200" y2="168" stroke="rgba(0,245,255,0.8)" stroke-width="1"/>
+          <line x1="229" y1="168" x2="234" y2="168" stroke="rgba(0,245,255,0.8)" stroke-width="1"/>
+          <line x1="217" y1="156" x2="217" y2="151" stroke="rgba(0,245,255,0.8)" stroke-width="1"/>
+          <line x1="217" y1="180" x2="217" y2="185" stroke="rgba(0,245,255,0.8)" stroke-width="1"/>
+          <!-- Eye scan effect -->
+          <ellipse cx="217" cy="168" rx="22" ry="15" fill="none" stroke="rgba(0,245,255,0.2)" stroke-width="8">
+            <animate attributeName="stroke-opacity" values="0.2;0.5;0.2" dur="2s" repeatCount="indefinite"/>
+          </ellipse>
+
+          <!-- Cybernetic implants on right side of face -->
+          <path d="M240 155 L260 145 L268 155 L260 165 Z" fill="#0a1824" stroke="rgba(0,245,255,0.5)" stroke-width="1"/>
+          <rect x="244" y="172" width="24" height="16" rx="2" fill="#0a1824" stroke="rgba(0,245,255,0.4)" stroke-width="1"/>
+          <line x1="248" y1="176" x2="264" y2="176" stroke="rgba(0,245,255,0.4)" stroke-width="1"/>
+          <line x1="248" y1="180" x2="260" y2="180" stroke="rgba(0,245,255,0.3)" stroke-width="1"/>
+          <line x1="248" y1="184" x2="264" y2="184" stroke="rgba(0,245,255,0.4)" stroke-width="1"/>
+
+          <!-- Jaw augments -->
+          <path d="M145 210 L135 225 L145 240 L160 235" fill="none" stroke="rgba(0,245,255,0.3)" stroke-width="1.5"/>
+          <path d="M235 210 L245 225 L235 240 L220 235" fill="none" stroke="rgba(0,245,255,0.3)" stroke-width="1.5"/>
+          <circle cx="135" cy="225" r="4" fill="rgba(0,245,255,0.4)" stroke="rgba(0,245,255,0.8)" stroke-width="1"/>
+          <circle cx="245" cy="225" r="4" fill="rgba(0,245,255,0.4)" stroke="rgba(0,245,255,0.8)" stroke-width="1"/>
+
+          <!-- Mouth -->
+          <path d="M172 218 Q190 228 208 218" fill="none" stroke="rgba(200,232,240,0.5)" stroke-width="1.5" stroke-linecap="round"/>
+
+          <!-- Nose -->
+          <path d="M184 190 Q182 205 178 212 Q185 216 190 215 Q195 216 202 212 Q198 205 196 190" fill="rgba(0,245,255,0.03)" stroke="rgba(0,245,255,0.15)" stroke-width="1"/>
+
+          <!-- Data HUD lines from eye -->
+          <path d="M234 162 L270 142 L310 138" stroke="rgba(0,245,255,0.4)" stroke-width="1" fill="none"/>
+          <rect x="272" y="120" width="60" height="36" rx="2" fill="rgba(0,10,20,0.8)" stroke="rgba(0,245,255,0.5)" stroke-width="1"/>
+          <text x="280" y="134" font-family="Share Tech Mono" font-size="7" fill="#00f5ff">SCAN: ACTIVE</text>
+          <text x="280" y="144" font-family="Share Tech Mono" font-size="7" fill="rgba(0,245,255,0.7)">ID: NX-7731</text>
+          <text x="280" y="152" font-family="Share Tech Mono" font-size="7" fill="rgba(0,245,255,0.5)">SYS: 100%</text>
+
+          <!-- Side panel left -->
+          <rect x="68" y="160" width="20" height="60" rx="2" fill="#081520" stroke="rgba(0,245,255,0.3)" stroke-width="1"/>
+          <rect x="72" y="166" width="12" height="8" fill="rgba(0,245,255,0.1)" stroke="rgba(0,245,255,0.4)" stroke-width="1"/>
+          <rect x="72" y="178" width="12" height="8" fill="rgba(0,245,255,0.05)" stroke="rgba(0,245,255,0.3)" stroke-width="1"/>
+          <rect x="72" y="190" width="12" height="8" fill="rgba(255,0,60,0.1)" stroke="rgba(255,0,60,0.4)" stroke-width="1"/>
+          <rect x="72" y="202" width="12" height="8" fill="rgba(0,245,255,0.05)" stroke="rgba(0,245,255,0.3)" stroke-width="1"/>
+
+          <!-- Shoulders -->
+          <path d="M80 290 Q55 270 45 300 Q40 340 60 360 L80 340 Z" fill="#0d1f2d" stroke="rgba(0,245,255,0.2)" stroke-width="1"/>
+          <path d="M300 290 Q325 270 335 300 Q340 340 320 360 L300 340 Z" fill="#0d1f2d" stroke="rgba(0,245,255,0.2)" stroke-width="1"/>
+
+          <!-- Shoulder details -->
+          <circle cx="57" cy="310" r="8" fill="none" stroke="rgba(0,245,255,0.4)" stroke-width="1"/>
+          <circle cx="57" cy="310" r="4" fill="rgba(0,245,255,0.2)"/>
+          <circle cx="323" cy="310" r="8" fill="none" stroke="rgba(0,245,255,0.4)" stroke-width="1"/>
+          <circle cx="323" cy="310" r="4" fill="rgba(0,245,255,0.2)"/>
+
+          <!-- Pulsing elements -->
+          <circle cx="190" cy="345" r="22" fill="none" stroke="rgba(0,245,255,0.3)" stroke-width="2">
+            <animate attributeName="r" values="22;28;22" dur="2s" repeatCount="indefinite"/>
+            <animate attributeName="stroke-opacity" values="0.3;0;0.3" dur="2s" repeatCount="indefinite"/>
+          </circle>
+        </svg>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- STATS -->
+<div class="stats-bar">
+  <div class="stats-inner">
+    <div class="stat-item">
+      <span class="stat-num" id="s1">0</span>
+      <span class="stat-label">Neural Links</span>
+    </div>
+    <div class="stat-item">
+      <span class="stat-num" id="s2">0</span>
+      <span class="stat-label">Augments Deployed</span>
+    </div>
+    <div class="stat-item">
+      <span class="stat-num" id="s3">0%</span>
+      <span class="stat-label">Uptime Guaranteed</span>
+    </div>
+    <div class="stat-item">
+      <span class="stat-num" id="s4">0</span>
+      <span class="stat-label">Active Operators</span>
+    </div>
+  </div>
+</div>
+
+<!-- FEATURES -->
+<section class="section features" id="features">
+  <div style="max-width:1200px;margin:0 auto">
+    <div class="section-tag">Core Systems</div>
+    <h2>Augmentation <em>Modules</em></h2>
+    <p style="max-width:560px;color:rgba(200,232,240,0.6);font-size:1rem;line-height:1.8">Six primary systems form the Nexus architecture. Each engineered for seamless integration with the organic substrate.</p>
+    <div class="features-grid">
+
+      <div class="feature-card">
+        <div class="feature-num">SYS-01</div>
+        <div class="feature-icon">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+        </div>
+        <h3>Neural Interface</h3>
+        <p>Direct brain-machine communication at 48 Tbps. Thought-to-action latency under 0.3 milliseconds. Zero packet loss protocol.</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-num">SYS-02</div>
+        <div class="feature-icon">
+          <svg viewBox="0 0 24 24"><eye cx="12" cy="12" r="3"/><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+        </div>
+        <h3>Ocular Array</h3>
+        <p>Quad-spectrum visual enhancement. Thermal, UV, EM, and standard visible light simultaneous processing with tactical overlay HUD.</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-num">SYS-03</div>
+        <div class="feature-icon">
+          <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        </div>
+        <h3>Adaptive Shielding</h3>
+        <p>Subdermal carbon-lattice armor that hardens on impact. Self-repairing nanomesh with 98.7% ballistic threat mitigation.</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-num">SYS-04</div>
+        <div class="feature-icon">
+          <svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/><path d="M7 8l3 3 3-3 3 3"/></svg>
+        </div>
+        <h3>Cognitive Boost</h3>
+        <p>Quantum co-processor stack integrates with cerebral cortex. Processing acceleration up to 12,000× baseline human cognition.</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-num">SYS-05</div>
+        <div class="feature-icon">
+          <svg viewBox="0 0 24 24"><path d="M18 20V10"/><path d="M12 20V4"/><path d="M6 20v-6"/></svg>
+        </div>
+        <h3>Biometric Core</h3>
+        <p>Constant physiological monitoring with predictive health analytics. Automatic threat-response chemical synthesis and delivery.</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-num">SYS-06</div>
+        <div class="feature-icon">
+          <svg viewBox="0 0 24 24"><path d="M4 4h16v16H4z"/><path d="M9 9h6v6H9z"/><path d="M9 1v3M15 1v3M9 20v3M15 20v3M1 9h3M1 15h3M20 9h3M20 15h3"/></svg>
+        </div>
+        <h3>Grid Sync</h3>
+        <p>Persistent mesh-network uplink across all operative units. Hive-mind tactical coordination with 400ms global ping maximum.</p>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- SPECS -->
+<section class="section" id="specs">
+  <div class="specs-wrapper">
+    <div>
+      <div class="section-tag">Augmentation Data</div>
+      <h2>Performance <em>Metrics</em></h2>
+      <p style="color:rgba(200,232,240,0.6);font-size:1rem;line-height:1.8;margin-bottom:8px">Every augment is precision-engineered. These aren't upgrades — they're evolutions.</p>
+      <div class="spec-list">
+        <div class="spec-item">
+          <div class="spec-head">Neural Throughput <span>98%</span></div>
+          <div class="spec-bar"><div class="spec-fill" style="width:98%"></div></div>
+        </div>
+        <div class="spec-item">
+          <div class="spec-head">Structural Integrity <span>94%</span></div>
+          <div class="spec-bar"><div class="spec-fill" style="width:94%"></div></div>
+        </div>
+        <div class="spec-item">
+          <div class="spec-head">Reaction Override <span>87%</span></div>
+          <div class="spec-bar"><div class="spec-fill" style="width:87%"></div></div>
+        </div>
+        <div class="spec-item">
+          <div class="spec-head">Cognitive Sync <span>99.9%</span></div>
+          <div class="spec-bar"><div class="spec-fill" style="width:99%"></div></div>
+        </div>
+        <div class="spec-item">
+          <div class="spec-head">Power Efficiency <span>76%</span></div>
+          <div class="spec-bar"><div class="spec-fill" style="width:76%"></div></div>
+        </div>
+      </div>
+    </div>
+    <div class="spec-visual">
+      <div class="circuit-box">
+        <div class="circuit-inner">
+          <div class="circuit-label">
+            <div style="font-size:0.7rem;letter-spacing:3px;color:rgba(0,245,255,0.5);margin-bottom:12px">UNIT STATUS</div>
+            <div style="font-size:2rem;color:#00f5ff;text-shadow:0 0 20px #00f5ff">ONLINE</div>
+            <div style="font-size:0.65rem;letter-spacing:2px;color:rgba(0,245,255,0.4);margin-top:12px;font-family:Share Tech Mono">NX-CORE v3.7.1</div>
+            <div style="width:80px;height:1px;background:rgba(0,245,255,0.3);margin:20px auto"></div>
+            <div style="font-size:0.65rem;letter-spacing:1px;color:rgba(0,245,255,0.5);font-family:Share Tech Mono;line-height:2">
+              MEM: 128TB ACTIVE<br>
+              PROC: 48 QCORES<br>
+              NET: MESH-7 LIVE<br>
+              THREAT: NOMINAL
+            </div>
+          </div>
+        </div>
+        <!-- Corner brackets -->
+        <svg style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none" viewBox="0 0 300 360">
+          <path d="M0 30 L0 0 L30 0" stroke="#00f5ff" stroke-width="2" fill="none" opacity="0.8"/>
+          <path d="M270 0 L300 0 L300 30" stroke="#00f5ff" stroke-width="2" fill="none" opacity="0.8"/>
+          <path d="M0 330 L0 360 L30 360" stroke="#00f5ff" stroke-width="2" fill="none" opacity="0.8"/>
+          <path d="M270 360 L300 360 L300 330" stroke="#00f5ff" stroke-width="2" fill="none" opacity="0.8"/>
+        </svg>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- EVOLUTION TIMELINE -->
+<section class="section features" id="evolution" style="background:rgba(0,245,255,0.015)">
+  <div style="max-width:1200px;margin:0 auto;text-align:center">
+    <div class="section-tag" style="justify-content:center">Timeline</div>
+    <h2>The <em>Evolution</em> Protocol</h2>
+    <p style="color:rgba(200,232,240,0.6);font-size:1rem;line-height:1.8;max-width:500px;margin:0 auto">From concept to consciousness — the milestones that forged the Nexus age.</p>
+    <div class="timeline">
+      <div class="tl-item">
+        <div class="tl-year">2029</div>
+        <div class="tl-dot"></div>
+        <div class="tl-content">
+          <h4>Project Genesis</h4>
+          <p>First successful neural-silicon bridge established. Signal fidelity achieved at 94.2%. The merge begins.</p>
+        </div>
+      </div>
+      <div class="tl-item">
+        <div class="tl-year">2031</div>
+        <div class="tl-dot"></div>
+        <div class="tl-content">
+          <h4>The Cortex Array</h4>
+          <p>Cognitive acceleration module clears Phase III trials. 4,000× baseline enhancement certified. Operators go live.</p>
+        </div>
+      </div>
+      <div class="tl-item">
+        <div class="tl-year">2033</div>
+        <div class="tl-dot"></div>
+        <div class="tl-content">
+          <h4>Mesh Protocol Deployed</h4>
+          <p>Global grid synchronization network activated. 12,000 units now operating in unified tactical formation.</p>
+        </div>
+      </div>
+      <div class="tl-item">
+        <div class="tl-year">2035</div>
+        <div class="tl-dot"></div>
+        <div class="tl-content">
+          <h4>Nexus v3 — Present</h4>
+          <p>Full-spectrum augmentation now commercially available. The boundary between human and machine is no longer a question.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="cta-section" id="cta">
+  <div class="section-tag" style="justify-content:center">Access Protocol</div>
+  <h2>Ready to <em>Transcend</em>?</h2>
+  <p>Join 40,000+ operators who have already crossed the threshold. Your evolution awaits initialization.</p>
+  <div class="cta-input-row">
+    <input type="email" placeholder="ENTER NEURAL ID / EMAIL" />
+    <button>INITIALIZE</button>
+  </div>
+  <p style="margin-top:20px;font-size:0.8rem;font-family:'Share Tech Mono',monospace;color:rgba(200,232,240,0.3);letter-spacing:2px">
+    ◆ SECURE LINK ◆ ENCRYPTED ◆ NO SPAM PROTOCOL
+  </p>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-logo">NEX<span>U</span>S</div>
+  <div class="footer-links">
+    <a href="#">Protocol</a>
+    <a href="#">Systems</a>
+    <a href="#">Operators</a>
+    <a href="#">Compliance</a>
+    <a href="#">Contact</a>
+  </div>
+  <div class="footer-copy">© 2035 NEXUS CORP // ALL AUGMENTS RESERVED</div>
+</footer>
+
+<script>
+  // Cursor
+  const cursor = document.getElementById('cursor');
+  const ring = document.getElementById('cursor-ring');
+  let mx = 0, my = 0, rx = 0, ry = 0;
+  document.addEventListener('mousemove', e => { mx = e.clientX; my = e.clientY; });
+  function animCursor() {
+    cursor.style.left = mx + 'px'; cursor.style.top = my + 'px';
+    rx += (mx - rx) * 0.12; ry += (my - ry) * 0.12;
+    ring.style.left = rx + 'px'; ring.style.top = ry + 'px';
+    requestAnimationFrame(animCursor);
+  }
+  animCursor();
+  document.querySelectorAll('a,button,input').forEach(el => {
+    el.addEventListener('mouseenter', () => { cursor.style.transform = 'translate(-50%,-50%) scale(2)'; ring.style.opacity = '0'; });
+    el.addEventListener('mouseleave', () => { cursor.style.transform = 'translate(-50%,-50%) scale(1)'; ring.style.opacity = '0.5'; });
+  });
+
+  // Counter animation
+  function animCount(el, target, suffix, duration) {
+    let start = 0; const step = target / (duration / 16);
+    const timer = setInterval(() => {
+      start = Math.min(start + step, target);
+      el.textContent = Math.floor(start).toLocaleString() + suffix;
+      if (start >= target) clearInterval(timer);
+    }, 16);
+  }
+  const observer = new IntersectionObserver(entries => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        animCount(document.getElementById('s1'), 40000, '+', 1800);
+        animCount(document.getElementById('s2'), 128, 'K', 1800);
+        animCount(document.getElementById('s3'), 99, '%', 1400);
+        animCount(document.getElementById('s4'), 12000, '+', 1800);
+        observer.disconnect();
+      }
+    });
+  }, { threshold: 0.3 });
+  observer.observe(document.querySelector('.stats-bar'));
+
+  // Mobile menu
+  function openMobileMenu() { document.getElementById('mobileMenu').classList.add('open'); }
+  function closeMobileMenu() { document.getElementById('mobileMenu').classList.remove('open'); }
+  document.querySelectorAll('.mobile-menu a').forEach(a => a.addEventListener('click', closeMobileMenu));
+
+  // Glitch data-text sync
+  document.querySelectorAll('.glitch').forEach(el => {
+    el.setAttribute('data-text', el.textContent);
+  });
+</script>
+</body>
+</html>
